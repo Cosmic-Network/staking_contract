@@ -11,14 +11,13 @@ contract StakingContract is Ownable, ReentrancyGuard{
     using SafeMath for uint;
     using SafeMath for uint256;
 
-    // 1 lockup types (1 -  one month, 2 - 3 months, 3 - 6 months, 4 -  1 year)
-    // 1 month lockup - earn per week 2%
+    // 1 lockup types (1 - 3 months, 2 - 6 months, 3 -  1 year)
     // 3 month lockup - earn per week 2.5%
     // 6 month lockup - earn per week 5%
     // 1 year lockup - earn per week 7.5%
 
-    enum LockupType {ONE_MONTH, THREE_MONTHS, SIX_MONTHS, ONE_YEAR}
-    uint256[] public lockupDays = [30_000_000_000, 90_000_000_000, 180_000_000_000, 365_000_000_000];
+    enum LockupType {THREE_MONTHS, SIX_MONTHS, ONE_YEAR}
+    uint256[] public lockupDays = [90_000_000_000, 180_000_000_000, 365_000_000_000];
 
     struct userInfo{
         uint256 totalStaked;
@@ -33,15 +32,15 @@ contract StakingContract is Ownable, ReentrancyGuard{
     mapping(address => userInfo) public userInfoMap;
 
     // reward rates per day
-    uint256[] public rewardRatesPerDay = [2857142857, 3571428571, 7142857143, 10714285714];
+    uint256[] public rewardRatesPerDay = [3571428571, 7142857143, 10714285714];
     uint256 rewardFactor = 1e12;
 
     bool public isForceUnstakeAllowed = false;
 
 
     // penalty
-    // loose 10%, 15%, 20%, and 25% respectively
-    uint256[] public penaltyRates = [100000000000, 150000000000, 200000000000, 250000000000];
+    // loose 15%, 20%, and 25% respectively
+    uint256[] public penaltyRates = [150000000000, 200000000000, 250000000000];
     
     address public cosmicTokenAddress;
     constructor(address _cosmicTokenAddress) {
@@ -50,6 +49,7 @@ contract StakingContract is Ownable, ReentrancyGuard{
     
     receive() external payable {
   	}
+
 
     function updateRewardRatesPerDay(uint256[] memory _rewardRatesPerDay) public onlyOwner {
         rewardRatesPerDay = _rewardRatesPerDay;
@@ -68,7 +68,7 @@ contract StakingContract is Ownable, ReentrancyGuard{
     }
 
     function stake(uint256 _amount, uint256 _lockupType) public nonReentrant {
-        require(_lockupType >= 0 && _lockupType <= 3, "Invalid lockup type");
+        require(_lockupType >= 0 && _lockupType <= 2, "Invalid lockup type");
         require(_amount > 0, "Invalid amount");
         IERC20(cosmicTokenAddress).transferFrom(msg.sender, address(this), _amount);
         if(userInfoMap[msg.sender].lastStaked != 0){
