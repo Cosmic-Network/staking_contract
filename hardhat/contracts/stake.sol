@@ -116,16 +116,20 @@ contract StakingContract is Ownable, ReentrancyGuard{
             uint256 _pendingRewards = calculatePendingRewards(msg.sender);
             IERC20(cosmicTokenAddress).transfer(msg.sender, userInfoMap[msg.sender].totalStaked.add(_pendingRewards));
         }
+        userInfoMap[msg.sender].pendingRewards = 0;
+        userInfoMap[msg.sender].lastRewardCalculated = block.timestamp;
+        userInfoMap[msg.sender].totalStaked = 0;
 
     }
 
 
     function claimRewards() public nonReentrant{
         uint256 _pendingRewards = calculatePendingRewards(msg.sender);
-        IERC20(cosmicTokenAddress).transfer(msg.sender, _pendingRewards);
-        userInfoMap[msg.sender].totalClaimed = userInfoMap[msg.sender].totalClaimed.add(_pendingRewards);
+        userInfoMap[msg.sender].lastRewardCalculated = block.timestamp;
         userInfoMap[msg.sender].pendingRewards = 0;
+        userInfoMap[msg.sender].totalClaimed = userInfoMap[msg.sender].totalClaimed.add(_pendingRewards);
         userInfoMap[msg.sender].lastClaimed = block.timestamp;
+        IERC20(cosmicTokenAddress).transfer(msg.sender, _pendingRewards);
     }
 
 
