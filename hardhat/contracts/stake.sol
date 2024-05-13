@@ -17,7 +17,7 @@ contract StakingContract is Ownable, ReentrancyGuard{
     // 1 year lockup - earn per week 7.5%
 
     enum LockupType {THREE_MONTHS, SIX_MONTHS, ONE_YEAR}
-    uint256[] public lockupDays = [90_000_000_000, 180_000_000_000, 365_000_000_000];
+    uint256[] public lockupDays = [15_000_000_000, 30_000_000_000, 60_000_000_000];
 
     struct userInfo{
         uint256 totalStaked;
@@ -32,7 +32,7 @@ contract StakingContract is Ownable, ReentrancyGuard{
     mapping(address => userInfo) public userInfoMap;
 
     // reward rates per day
-    uint256[] public rewardRatesPerDay = [3571428571, 7142857143, 10714285714];
+    uint256[] public rewardRatesPerDay = [1428571428, 2142857142, 3571428571];
     uint256 rewardFactor = 1e12;
 
     bool public isForceUnstakeAllowed = false;
