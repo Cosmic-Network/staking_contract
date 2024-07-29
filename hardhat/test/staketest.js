@@ -39,250 +39,209 @@ describe("StakingContract", function () {
   });
 
   describe("Staking", function () {
-    it("Should be no penalty if unstake after limit", async function () {
+
+    it("Should check APY numbers for max stake period", async function () {
       const {
         token,
         dsContract,
       } = await loadFixture(deploy);
       const [owner, otherAccount] = await ethers.getSigners();
 
-      await token.approve(dsContract.address, 100000);
-      await dsContract.stake(100000, 0);
+      await token.approve(dsContract.address, 100);
+      await dsContract.stake(100, 365);
       await token.transfer(dsContract.address, 100000);
-      const userInfo = await dsContract.userInfoMap(owner.address);
+      const userInfo = await dsContract.userStakes(owner.address, 0);
+      expect(userInfo.amount).to.equal(100);
+      await time.increase(60 * 60 * 24 *365);
 
-      expect(userInfo.totalStaked).to.equal(100000);
-      await time.increase(60 * 60 * 24 *30);
-
-      const pendingReward = await dsContract.calculatePendingRewards(owner.address);
-      expect(pendingReward).to.equal(4285);
+      const pendingReward = await dsContract.calculatePendingRewards(0);
+      expect(pendingReward).to.equal(200);
 
       const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
-      await dsContract.unstake();
+      await dsContract.unstake(0);
       const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(104285);
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(300);
 
     });
 
-    it("Should be a penalty if unstake before days for type 1", async function () {
+    it("Should check APY numbers for max stake period with smaller bonus", async function () {
       const {
         token,
         dsContract,
       } = await loadFixture(deploy);
       const [owner, otherAccount] = await ethers.getSigners();
+      expect(await dsContract.calculateBonus(1000)).to.equal(1_100_000);
+      await token.approve(dsContract.address, 10000);
+      await dsContract.stake(1000, 365);
+      await token.transfer(dsContract.address, 10000);
+      const userInfo = await dsContract.userStakes(owner.address, 0);
+      expect(userInfo.amount).to.equal(1000);
+      await time.increase(60 * 60 * 24 *365);
 
-      await token.approve(dsContract.address, 100000);
-      await dsContract.stake(100000, 0);
-      dsContract.updateForceUnstakeAllowed(true);
-      await token.transfer(dsContract.address, 100000);
-      const userInfo = await dsContract.userInfoMap(owner.address);
-
-      expect(userInfo.totalStaked).to.equal(100000);
-      await time.increase(60 * 60 * 24 *1);
-
-      const pendingReward = await dsContract.calculatePendingRewards(owner.address);
-      expect(pendingReward).to.equal(142);
+      const pendingReward = await dsContract.calculatePendingRewards(0);
+      expect(pendingReward).to.equal(2200);
 
       const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
-      await dsContract.unstake();
+      await dsContract.unstake(0);
       const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(84979);
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(3200);
 
     });
 
-    it("Should be a penalty if unstake before days for type 2", async function () {
+
+    it("Should check APY numbers for max stake period with larger bonus", async function () {
       const {
         token,
         dsContract,
       } = await loadFixture(deploy);
       const [owner, otherAccount] = await ethers.getSigners();
-
-      await token.approve(dsContract.address, 100000);
-      await dsContract.stake(100000, 1);
-      dsContract.updateForceUnstakeAllowed(true);
+      expect(await dsContract.calculateBonus(5000)).to.equal(1_200_000);
+      await token.approve(dsContract.address, 10000);
+      await dsContract.stake(5000, 365);
       await token.transfer(dsContract.address, 100000);
-      const userInfo = await dsContract.userInfoMap(owner.address);
+      const userInfo = await dsContract.userStakes(owner.address, 0);
+      expect(userInfo.amount).to.equal(5000);
+      await time.increase(60 * 60 * 24 *365);
 
-      expect(userInfo.totalStaked).to.equal(100000);
-      await time.increase(60 * 60 * 24 *1);
-
-      const pendingReward = await dsContract.calculatePendingRewards(owner.address);
-      expect(pendingReward).to.equal(214);
+      const pendingReward = await dsContract.calculatePendingRewards(0);
+      expect(pendingReward).to.equal(12000);
 
       const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
-      await dsContract.unstake();
+      await dsContract.unstake(0);
       const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(79958);
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(17000);
 
     });
 
-    it("Should be a penalty if unstake before days for type 3", async function () {
+    it("Should check APY numbers for max stake period and test reward claims", async function () {
       const {
         token,
         dsContract,
       } = await loadFixture(deploy);
       const [owner, otherAccount] = await ethers.getSigners();
 
-      await token.approve(dsContract.address, 100000);
-      await dsContract.stake(100000, 2);
-      dsContract.updateForceUnstakeAllowed(true);
+      await token.approve(dsContract.address, 100);
+      await dsContract.stake(100, 365);
       await token.transfer(dsContract.address, 100000);
-      const userInfo = await dsContract.userInfoMap(owner.address);
+      const userInfo = await dsContract.userStakes(owner.address, 0);
+      expect(userInfo.amount).to.equal(100);
+      await time.increase(60 * 60 * 24 *365);
 
-      expect(userInfo.totalStaked).to.equal(100000);
-      await time.increase(60 * 60 * 24 *1);
-
-      const pendingReward = await dsContract.calculatePendingRewards(owner.address);
-      expect(pendingReward).to.equal(357);
+      const pendingReward = await dsContract.calculatePendingRewards(0);
+      expect(pendingReward).to.equal(200);
 
       const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
-      await dsContract.unstake();
+      await dsContract.claimRewards(0);
       const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(74911);
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(200);
+
+      await time.increase(60 * 60 * 24 *365);
+      const pendingReward1 = await dsContract.calculatePendingRewards(0);
+      expect(pendingReward1).to.equal(200);
+
+
+      const userBalanceBeforeUnstake1 = await token.balanceOf(owner.address);
+      await dsContract.unstake(0);
+      const userBalanceAfterUnstake1 = await token.balanceOf(owner.address);
+
+      expect(userBalanceAfterUnstake1.sub(userBalanceBeforeUnstake1)).to.equal(300);
 
     });
 
-    it("Should simple staking type 1", async function () {
+
+    it("Should allow multiple stake instances", async function () {
       const {
         token,
         dsContract,
       } = await loadFixture(deploy);
       const [owner, otherAccount] = await ethers.getSigners();
 
-      await token.approve(dsContract.address, 100000);
-      await dsContract.stake(100000, 0);
+      await token.approve(dsContract.address, 10000);
+      await dsContract.stake(100, 365);
+      await token.transfer(dsContract.address, 100000);
+      const userInfo = await dsContract.userStakes(owner.address, 0);
+      expect(userInfo.amount).to.equal(100);
 
-      const userInfo = await dsContract.userInfoMap(owner.address);
+      await dsContract.stake(100, 100);
+      const userInfo1 = await dsContract.userStakes(owner.address, 1);
+      expect(userInfo1.amount).to.equal(100);
+      console.log(userInfo1);
+      await time.increase(60 * 60 * 24 *365);
 
-      expect(userInfo.totalStaked).to.equal(100000);
-      await time.increase(60 * 60 * 24 );
+      const pendingReward1 = await dsContract.calculatePendingRewards(1);
+      expect(pendingReward1).to.equal(54);
 
-      const pendingReward = await dsContract.calculatePendingRewards(owner.address);
-      expect(pendingReward).to.equal(142);
+      const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
+      await dsContract.unstake(0);
+      await dsContract.unstake(1);
+      const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(454);
+      expect(await dsContract.userStakeCount(owner.address)).to.equal(2);
+      expect(dsContract.unstake(0)).to.be.revertedWith("Already unstaked");
+
+      await time.increase(60 * 60 * 24 *10000);
+      const pendingRewards = await dsContract.calculatePendingRewards(1);
+      expect(pendingRewards).to.equal(0);
     });
 
-    it("Should simple staking type 2", async function () {
+
+
+    it("Should penalize max if unstake on day 0", async function () {
       const {
         token,
         dsContract,
       } = await loadFixture(deploy);
       const [owner, otherAccount] = await ethers.getSigners();
 
-      await token.approve(dsContract.address, 100000);
-      await dsContract.stake(100000, 1);
+      await token.approve(dsContract.address, 100);
+      await dsContract.stake(100, 365);
+      await token.transfer(dsContract.address, 100000);
+      const userInfo = await dsContract.userStakes(owner.address, 0);
+      expect(userInfo.amount).to.equal(100);
 
-      const userInfo = await dsContract.userInfoMap(owner.address);
+      const pendingReward = await dsContract.calculatePendingRewards(0);
+      expect(pendingReward).to.equal(0);
 
-      expect(userInfo.totalStaked).to.equal(100000);
-      await time.increase(60 * 60 * 24 );
+      const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
+      await dsContract.unstake(0);
+      const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      const pendingReward = await dsContract.calculatePendingRewards(owner.address);
-      expect(pendingReward).to.equal(214);
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(70);
+      const userInfo1 = await dsContract.userStakes(owner.address, 0);
+      console.log(userInfo1);
 
     });
 
-    it("Should simple staking type 3", async function () {
+
+    it("Should check APY numbers for min stake period", async function () {
       const {
         token,
         dsContract,
       } = await loadFixture(deploy);
       const [owner, otherAccount] = await ethers.getSigners();
 
-      await token.approve(dsContract.address, 100000);
-      await dsContract.stake(100000, 2);
+      await token.approve(dsContract.address, 100);
+      await dsContract.stake(100, 1);
+      await token.transfer(dsContract.address, 100000);
+      const userInfo = await dsContract.userStakes(owner.address, 0);
+      expect(userInfo.amount).to.equal(100);
+      await time.increase(60 * 60 * 24 *365);
 
-      const userInfo = await dsContract.userInfoMap(owner.address);
+      const pendingReward = await dsContract.calculatePendingRewards(0);
+      expect(pendingReward).to.equal(0);
 
-      expect(userInfo.totalStaked).to.equal(100000);
-      await time.increase(60 * 60 * 24 );
+      const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
+      await dsContract.unstake(0);
+      const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      const pendingReward = await dsContract.calculatePendingRewards(owner.address);
-      expect(pendingReward).to.equal(357);
-
-    });
-
-    it("Should test claiming", async function () {
-      const {
-        token,
-        dsContract,
-      } = await loadFixture(deploy);
-      const [owner, otherAccount] = await ethers.getSigners();
-
-      await token.approve(dsContract.address, 100000);
-      await dsContract.stake(100000, 2);
-
-      const userInfo = await dsContract.userInfoMap(owner.address);
-
-      expect(userInfo.totalStaked).to.equal(100000);
-      await time.increase(60 * 60 * 24 );
-
-      const pendingReward = await dsContract.calculatePendingRewards(owner.address);
-      expect(pendingReward).to.equal(357);
-
-      const userBalanceBeforeClaim = await token.balanceOf(owner.address);
-      await dsContract.claimRewards();
-
-      const pendingRewardAfterClaim = await dsContract.calculatePendingRewards(owner.address);
-      expect(pendingRewardAfterClaim).to.equal(0);
-      const userBalanceAfterClaim = await token.balanceOf(owner.address);
-
-      expect(userBalanceAfterClaim.sub(userBalanceBeforeClaim)).to.equal(357);
-      const userInfoAfterClaim = await dsContract.userInfoMap(owner.address);
-      expect(userInfoAfterClaim.totalStaked).to.equal(100000);
-    });
-
-    it("should test staking again with same lock type", async function () {
-      const {
-        token,
-        dsContract,
-      } = await loadFixture(deploy);
-      const [owner, otherAccount] = await ethers.getSigners();
-
-      await token.approve(dsContract.address, 500000);
-      await dsContract.stake(100000, 0);
-      
-      const userInfo = await dsContract.userInfoMap(owner.address);
-      
-      expect(userInfo.totalStaked).to.equal(100000);
-      // skip time by a week
-      await dsContract.stake(100000, 0);
-
-      const userInfoAfterSecondStake = await dsContract.userInfoMap(owner.address);
-
-      expect(userInfoAfterSecondStake.totalStaked).to.equal(200000);
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(100);
 
     });
-
-    it("should test staking again with different lock type", async function () {
-      const {
-        token,
-        dsContract,
-      } = await loadFixture(deploy);
-      const [owner, otherAccount] = await ethers.getSigners();
-
-      await token.approve(dsContract.address, 500000);
-      await dsContract.stake(100000, 0);
-      
-      const userInfo = await dsContract.userInfoMap(owner.address);
-      // increase time by a day
-      await time.increase(60 * 60 * 24 );
-      expect(userInfo.totalStaked).to.equal(100000);
-      // skip time by a week
-      await dsContract.stake(100000, 1);
-
-      const userInfoAfterSecondStake = await dsContract.userInfoMap(owner.address);
-
-      expect(userInfoAfterSecondStake.totalStaked).to.equal(200000);
-    });
-
-
-
-
   });
 
 });
