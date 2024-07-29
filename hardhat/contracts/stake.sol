@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity 0.8.19;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -11,38 +11,33 @@ contract StakingContract is Ownable, ReentrancyGuard{
     using SafeMath for uint;
     using SafeMath for uint256;
 
-    // 1 lockup types (1 - 3 months, 2 - 6 months, 3 -  1 year)
-    // 3 month lockup - earn per week 2.5%
-    // 6 month lockup - earn per week 5%
-    // 1 year lockup - earn per week 7.5%
-
-    enum LockupType {THREE_MONTHS, SIX_MONTHS, ONE_YEAR}
-    uint256[] public lockupDays = [15_000_000_000, 30_000_000_000, 60_000_000_000];
-
-    struct userInfo{
-        uint256 totalStaked;
+    struct stakeInfo{
+        uint256 amount;
+        uint256 lockupDays;
+        uint256 stakedOn;
         uint256 lastRewardCalculated;
-        uint256 lastStaked;
         uint256 pendingRewards;
         uint256 lastClaimed;
         uint256 totalClaimed;
-        LockupType lockupType;
+        uint256 apy;
+        uint256 unstakedOn;
+        uint256 penalty;
+
     }
 
-    mapping(address => userInfo) public userInfoMap;
+    uint256 public constant MAX_APY = 2_000_000;
+    uint256 public constant MAX_LOCKUP_DAYS = 365;
+    uint256 public constant MAX_PENALTY = 300_000;
+    uint256 public constant PRECISION = 1e6;
 
-    // reward rates per day
-    uint256[] public rewardRatesPerDay = [1428571428, 2142857142, 3571428571];
-    uint256 rewardFactor = 1e12;
+    uint256[2] public bonusTiers = [1_000, 5_000];
+    uint256[2] public bonusBoosts = [1_100_000, 1_200_000];
 
-    bool public isForceUnstakeAllowed = false;
+    mapping(address => uint256) public userStakeCount;
 
-
-    // penalty
-    // loose 15%, 20%, and 25% respectively
-    uint256[] public penaltyRates = [150000000000, 200000000000, 250000000000];
-    
     address public cosmicTokenAddress;
+    mapping (address user => stakeInfo[]) public userStakes;
+
     constructor(address _cosmicTokenAddress) {
         cosmicTokenAddress = _cosmicTokenAddress;
     }
@@ -50,93 +45,110 @@ contract StakingContract is Ownable, ReentrancyGuard{
     receive() external payable {
   	}
 
-
-    function updateRewardRatesPerDay(uint256[] memory _rewardRatesPerDay) public onlyOwner {
-        rewardRatesPerDay = _rewardRatesPerDay;
+    function calculateBonus(uint256 _amount) public view returns(uint256){
+        uint256 supply_percentage = _amount.mul(PRECISION).div(IERC20(cosmicTokenAddress).totalSupply());
+        if(supply_percentage >= bonusTiers[1]){
+            return bonusBoosts[1];
+        }
+        if(supply_percentage >= bonusTiers[0]){
+            return bonusBoosts[0];
+        }
+        return PRECISION;
     }
 
-    function updatePenaltyRates(uint256[] memory _penaltyRates) public onlyOwner {
-        penaltyRates = _penaltyRates;
+    function calculateAPY(uint256 _lockupDays) public pure returns(uint256){
+        return _lockupDays.mul(MAX_APY).div(365);
     }
 
-    function updateCosmicTokenAddress(address _CosmicAddress) public onlyOwner {
-        cosmicTokenAddress = _CosmicAddress;
+    function calculatePenalty(uint256 _lockupDays, uint256 _daysSinceLastStaked) public pure returns(uint256){
+        if (_daysSinceLastStaked >= _lockupDays){
+            return 0;
+        }
+        return MAX_PENALTY.sub(_daysSinceLastStaked.mul(MAX_PENALTY).div(_lockupDays));
     }
-
-    function updateForceUnstakeAllowed(bool _isForceUnstakeAllowed) public onlyOwner {
-        isForceUnstakeAllowed = _isForceUnstakeAllowed;
-    }
-
-    function stake(uint256 _amount, uint256 _lockupType) public nonReentrant {
-        require(_lockupType >= 0 && _lockupType <= 2, "Invalid lockup type");
+ 
+    function stake(uint256 _amount, uint256 _lockupDays) public nonReentrant {
+        require(_lockupDays <= MAX_LOCKUP_DAYS, "Invalid lockup days");
+        require(_lockupDays > 0, "Invalid lockup days");
+        require(_lockupDays <= 365, "Invalid lockup days");
         require(_amount > 0, "Invalid amount");
         IERC20(cosmicTokenAddress).transferFrom(msg.sender, address(this), _amount);
-        if(userInfoMap[msg.sender].lastStaked != 0){
-            // lockup type must be greater than or equal to previous lockup type
-            require(_lockupType >= uint256(userInfoMap[msg.sender].lockupType), "Invalid lockup type");
-            // calculate pending rewards and update userInfoMap
-            uint256 _pendingRewards = calculatePendingRewards(msg.sender);
-            userInfoMap[msg.sender].pendingRewards = _pendingRewards;
-        }
+        
+        uint256 apy = calculateAPY(_lockupDays);
 
-        userInfoMap[msg.sender].lastRewardCalculated = block.timestamp;
-        userInfoMap[msg.sender].lastStaked = block.timestamp;
-        userInfoMap[msg.sender].totalStaked = userInfoMap[msg.sender].totalStaked.add(_amount);
-        userInfoMap[msg.sender].lockupType = LockupType(_lockupType);
-
+        stakeInfo memory newStake = stakeInfo({
+            amount: _amount,
+            lockupDays: _lockupDays,
+            stakedOn: block.timestamp,
+            lastRewardCalculated: block.timestamp,
+            pendingRewards: 0,
+            lastClaimed: block.timestamp,
+            totalClaimed: 0,
+            apy: apy,
+            unstakedOn: 0,
+            penalty: 0
+        });
+        userStakeCount[msg.sender] = userStakeCount[msg.sender].add(1);
+        userStakes[msg.sender].push(newStake);
     }
 
-    function calculatePendingRewards(address _account) public view returns(uint256){
-        uint256 _lastRewardCalculated = userInfoMap[_account].lastRewardCalculated;
-        uint256 _totalStaked = userInfoMap[_account].totalStaked;
-        uint256 _lockupType = uint256(userInfoMap[_account].lockupType);
+    function calculatePendingRewards(uint256 _index) public view returns(uint256){
+        address _account = msg.sender;
+        uint256 _lastRewardCalculated = userStakes[_account][_index].lastRewardCalculated;
+        uint256 _amount = userStakes[_account][_index].amount;
+        uint256 _apy = userStakes[_account][_index].apy;
         uint256 _currentTime = block.timestamp;
         uint256 _daysSinceLastRewardCalculated = _currentTime.sub(_lastRewardCalculated).mul(1e9).div(86400);
-        uint256 _rewardRate = rewardRatesPerDay[_lockupType];
-        uint256 _pendingRewards = _totalStaked.mul(_daysSinceLastRewardCalculated).mul(_rewardRate).div(rewardFactor).div(1e9);
+        uint256 _amountAfterBonus = _amount.mul(calculateBonus(_amount)).div(PRECISION);
+        uint256 _pendingRewards = _amountAfterBonus.mul(_daysSinceLastRewardCalculated).mul(_apy).div(365).div(1e9).div(PRECISION);
         
-        return _pendingRewards.add(userInfoMap[_account].pendingRewards);
+        return _pendingRewards.add(userStakes[_account][_index].pendingRewards);
     }
 
-    function unstake() public nonReentrant{
-        // check if unstaking before lockup period
-        uint256 _lastStaked = userInfoMap[msg.sender].lastStaked;
-        uint256 _daysSinceLastStaked = block.timestamp.sub(_lastStaked).mul(1e9).div(86400);
-        if (_daysSinceLastStaked < lockupDays[uint256(userInfoMap[msg.sender].lockupType)]){
-            require(isForceUnstakeAllowed, "Unstake not allowed before lockup period");
-            // calculate penalty
-            uint256 _penaltyRate = penaltyRates[uint256(userInfoMap[msg.sender].lockupType)];
-            uint256 _pendingRewards = calculatePendingRewards(msg.sender);
-           
-            uint256 _penalty = (userInfoMap[msg.sender].totalStaked.add(_pendingRewards)).mul(_penaltyRate).div(rewardFactor);
-            IERC20(cosmicTokenAddress).transfer(msg.sender, userInfoMap[msg.sender].totalStaked.sub(_penalty));
-        }
-        else{
-            // calculate pending rewards and transfer
-            uint256 _pendingRewards = calculatePendingRewards(msg.sender);
-            IERC20(cosmicTokenAddress).transfer(msg.sender, userInfoMap[msg.sender].totalStaked.add(_pendingRewards));
-        }
-        userInfoMap[msg.sender].pendingRewards = 0;
-        userInfoMap[msg.sender].lastRewardCalculated = block.timestamp;
-        userInfoMap[msg.sender].totalStaked = 0;
+    function calculateUnstakePenalty(uint256 _index) public view returns(uint256){
+        address _account = msg.sender;
+        uint256 _lastStaked = userStakes[_account][_index].stakedOn;
+        uint256 _lockupDays = userStakes[_account][_index].lockupDays;
+        uint256 _daysSinceLastStaked = (block.timestamp.sub(_lastStaked)).div(86400);
+
+        uint256 _penalty = calculatePenalty(_lockupDays, _daysSinceLastStaked);
+        return _penalty;
+    }
+
+    function unstake(uint256 _index) public nonReentrant{
+        address _account = msg.sender;
+        require(_index < userStakes[_account].length, "Invalid index");
+        require(userStakes[_account][_index].unstakedOn == 0, "Already unstaked");
+        uint256 _penalty = calculateUnstakePenalty(_index);
+        uint256 _penaltyAmount = userStakes[_account][_index].amount.mul(_penalty).div(PRECISION);
+        uint256 _pendingRewards = calculatePendingRewards(_index);
+        uint256 _amount = userStakes[_account][_index].amount;
+
+        userStakes[_account][_index].pendingRewards = 0;
+        userStakes[_account][_index].totalClaimed = userStakes[_account][_index].totalClaimed.add(_pendingRewards);
+        userStakes[_account][_index].lastRewardCalculated = block.timestamp;
+        userStakes[_account][_index].amount = 0;
+        userStakes[_account][_index].unstakedOn = block.timestamp;
+        userStakes[_account][_index].penalty = _penalty;
+
+        IERC20(cosmicTokenAddress).transfer(_account, _amount.sub(_penaltyAmount).add(_pendingRewards));
 
     }
 
-
-    function claimRewards() public nonReentrant{
-        uint256 _pendingRewards = calculatePendingRewards(msg.sender);
-        userInfoMap[msg.sender].lastRewardCalculated = block.timestamp;
-        userInfoMap[msg.sender].pendingRewards = 0;
-        userInfoMap[msg.sender].totalClaimed = userInfoMap[msg.sender].totalClaimed.add(_pendingRewards);
-        userInfoMap[msg.sender].lastClaimed = block.timestamp;
-        IERC20(cosmicTokenAddress).transfer(msg.sender, _pendingRewards);
+    function claimRewards(uint256 _index) public nonReentrant{
+        address _account = msg.sender;
+        require(_index < userStakes[_account].length, "Invalid index");
+        uint256 _pendingRewards = calculatePendingRewards(_index);
+        userStakes[_account][_index].lastRewardCalculated = block.timestamp;
+        userStakes[_account][_index].pendingRewards = 0;
+        userStakes[_account][_index].totalClaimed = userStakes[_account][_index].totalClaimed.add(_pendingRewards);
+        userStakes[_account][_index].lastClaimed = block.timestamp;
+        IERC20(cosmicTokenAddress).transfer(_account, _pendingRewards);
     }
-
 
     function emergenceyWithdrawTokens() public onlyOwner {
         IERC20(cosmicTokenAddress).transfer(owner(), IERC20(cosmicTokenAddress).balanceOf(address(this)));
     }
-
 
     function withdraw() public payable onlyOwner {
         (bool success, ) = payable(msg.sender).call{
