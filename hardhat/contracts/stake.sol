@@ -25,9 +25,9 @@ contract StakingContract is Ownable, ReentrancyGuard{
 
     }
 
-    uint256 public constant MAX_APY = 2_000_000;
+    uint256 public constant MAX_APY = 1_200_000;
     uint256 public constant MAX_LOCKUP_DAYS = 365;
-    uint256 public constant MAX_PENALTY = 300_000;
+    uint256 public max_penalty = 750_000;
     uint256 public constant PRECISION = 1e6;
 
     uint256[2] public bonusTiers = [1_000, 5_000];
@@ -60,11 +60,15 @@ contract StakingContract is Ownable, ReentrancyGuard{
         return _lockupDays.mul(MAX_APY).div(365);
     }
 
-    function calculatePenalty(uint256 _lockupDays, uint256 _daysSinceLastStaked) public pure returns(uint256){
+    function calculatePenalty(uint256 _lockupDays, uint256 _daysSinceLastStaked) public view returns(uint256){
         if (_daysSinceLastStaked >= _lockupDays){
             return 0;
         }
-        return MAX_PENALTY.sub(_daysSinceLastStaked.mul(MAX_PENALTY).div(_lockupDays));
+        return max_penalty.sub(_daysSinceLastStaked.mul(max_penalty).div(_lockupDays));
+    }
+
+    function updateMaxPenalty(uint256 _newPenalty) public onlyOwner {
+        max_penalty = _newPenalty;
     }
  
     function stake(uint256 _amount, uint256 _lockupDays) public nonReentrant {
