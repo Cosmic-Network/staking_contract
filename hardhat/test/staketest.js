@@ -13,8 +13,8 @@ describe("StakingContract", function () {
     // Contracts are deployed using the first signer/account by default
     const [owner] = await ethers.getSigners();
 
-    const tokenContract = await hre.ethers.getContractFactory("MyToken");
-    const token = await tokenContract.deploy("Test", "TST", 4);
+    const tokenContract = await hre.ethers.getContractFactory("CosmicNetwork");
+    const token = await tokenContract.deploy();
 
     const stakingContract = await hre.ethers.getContractFactory("StakingContract");
     const dsContract = await stakingContract.deploy(token.address);
@@ -71,22 +71,25 @@ describe("StakingContract", function () {
         dsContract,
       } = await loadFixture(deploy);
       const [owner, otherAccount] = await ethers.getSigners();
-      expect(await dsContract.calculateBonus(1000)).to.equal(1_100_000);
-      await token.approve(dsContract.address, 10000);
-      await dsContract.stake(1000, 365);
-      await token.transfer(dsContract.address, 10000);
+      const totalSupply = await token.totalSupply();
+      console.log("ts", totalSupply);
+      const amount = BigInt("100000000000000000000000");
+      expect(await dsContract.calculateBonus(amount)).to.equal(1_100_000);
+      await token.approve(dsContract.address, amount);
+      await dsContract.stake(amount, 365);
+      await token.transfer(dsContract.address, BigInt("1000000000000000000000000"));
       const userInfo = await dsContract.userStakes(owner.address, 0);
-      expect(userInfo.amount).to.equal(1000);
+      expect(userInfo.amount).to.equal(amount);
       await time.increase(60 * 60 * 24 *365);
 
       const pendingReward = await dsContract.calculatePendingRewards(0);
-      expect(pendingReward).to.equal(2200);
+      expect(pendingReward).to.equal(BigInt("220000006976109589041095"));
 
       const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
       await dsContract.unstake(0);
       const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(3200);
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(BigInt("320000013952219178082191"));
 
     });
 
@@ -97,22 +100,23 @@ describe("StakingContract", function () {
         dsContract,
       } = await loadFixture(deploy);
       const [owner, otherAccount] = await ethers.getSigners();
-      expect(await dsContract.calculateBonus(5000)).to.equal(1_200_000);
-      await token.approve(dsContract.address, 10000);
-      await dsContract.stake(5000, 365);
-      await token.transfer(dsContract.address, 100000);
+      const amount = BigInt("500000000000000000000000");
+      expect(await dsContract.calculateBonus(amount)).to.equal(1_200_000);
+      await token.approve(dsContract.address, amount);
+      await dsContract.stake(amount, 365);
+      await token.transfer(dsContract.address, BigInt("5000000000000000000000000"));
       const userInfo = await dsContract.userStakes(owner.address, 0);
-      expect(userInfo.amount).to.equal(5000);
+      expect(userInfo.amount).to.equal(amount);
       await time.increase(60 * 60 * 24 *365);
 
       const pendingReward = await dsContract.calculatePendingRewards(0);
-      expect(pendingReward).to.equal(12000);
+      expect(pendingReward).to.equal(BigInt("1200000038051506849315068"));
 
       const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
       await dsContract.unstake(0);
       const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(17000);
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(BigInt("1700000076103013698630136"));
 
     });
 
