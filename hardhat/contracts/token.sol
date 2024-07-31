@@ -1,88 +1,50 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+// Compatible with OpenZeppelin Contracts ^5.0.0
+pragma solidity ^0.8.20;
 
-interface IERC20 {
-    function totalSupply() external view returns (uint256);
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool);
-    function allowance(address owner, address spender)
-        external
-        view
-        returns (uint256);
-    function approve(address spender, uint256 amount) external returns (bool);
-    function transferFrom(address sender, address recipient, uint256 amount)
-        external
-        returns (bool);
-}
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract ERC20 is IERC20 {
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(
-        address indexed owner, address indexed spender, uint256 value
-    );
+contract CosmicNetwork is ERC20, Ownable {
 
-    uint256 public totalSupply;
-    mapping(address => uint256) public balanceOf;
-    mapping(address => mapping(address => uint256)) public allowance;
-    string public name;
-    string public symbol;
-    uint8 public decimals;
+    uint256 public constant TIMELOCK = 1 days;
+    uint256 public mintQueueCounter = 0;
+    uint256 public mintExecutedCounter = 0;
 
-    constructor(string memory _name, string memory _symbol, uint8 _decimals) {
-        name = _name;
-        symbol = _symbol;
-        decimals = _decimals;
+    uint256 public maxSupply;
+    uint256 public initialSupply = 100_000_000 * (10 ** decimals());
+
+    struct MintRequest {
+        uint256 amount;
+        address to;
+        uint256 mintAfter;
+        uint256 executedOn;
     }
 
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool)
+    mapping(uint256 => MintRequest) public mintQueue;
+    mapping(address => bool) public blackList;
+
+    constructor()
+        ERC20("Cosmic Network", "COSMIC")
     {
-        balanceOf[msg.sender] -= amount;
-        balanceOf[recipient] += amount;
-        emit Transfer(msg.sender, recipient, amount);
-        return true;
+        maxSupply = 200_000_000 * (10 ** decimals());
+        _mint(msg.sender, initialSupply);
     }
 
-    function approve(address spender, uint256 amount) external returns (bool) {
-        allowance[msg.sender][spender] = amount;
-        emit Approval(msg.sender, spender, amount);
-        return true;
+    function mintRequest(uint256 amount, address to) external onlyOwner {
+        mintQueue[mintQueueCounter] = MintRequest(amount, to, block.timestamp + TIMELOCK, 0);
+        mintQueueCounter++;
     }
 
-    function transferFrom(address sender, address recipient, uint256 amount)
-        external
-        returns (bool)
-    {
-        allowance[sender][msg.sender] -= amount;
-        balanceOf[sender] -= amount;
-        balanceOf[recipient] += amount;
-        emit Transfer(sender, recipient, amount);
-        return true;
-    }
-
-    function _mint(address to, uint256 amount) internal {
-        balanceOf[to] += amount;
-        totalSupply += amount;
-        emit Transfer(address(0), to, amount);
-    }
-
-    function mint(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
-
-}
-
-contract MyToken is ERC20 {
-    constructor(string memory name, string memory symbol, uint8 decimals)
-        ERC20(name, symbol, decimals)
-    {
-        // Mint 100 tokens to msg.sender
-        // Similar to how
-        // 1 dollar = 100 cents
-        // 1 token = 1 * (10 ** decimals)
-        _mint(msg.sender, 100 * 10 ** uint256(decimals));
+    function mintApprove(uint256 _id) external onlyOwner {
+        // Timelock based minting
+        MintRequest storage request = mintQueue[_id];
+        require(request.mintAfter <= block.timestamp, "Mint request is not yet approved");
+        require(request.executedOn == 0, "Mint request is already executed");
+        require(request.amount > 0, "Invalid mint amount");
+        require(totalSupply() + request.amount <= maxSupply, "Max supply reached");
+        _mint(request.to, request.amount);
+        request.executedOn = block.timestamp;
+        mintExecutedCounter++;
     }
 }
