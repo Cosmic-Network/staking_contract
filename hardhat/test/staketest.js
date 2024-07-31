@@ -55,13 +55,13 @@ describe("StakingContract", function () {
       await time.increase(60 * 60 * 24 *365);
 
       const pendingReward = await dsContract.calculatePendingRewards(0);
-      expect(pendingReward).to.equal(200);
+      expect(pendingReward).to.equal(120);
 
       const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
       await dsContract.unstake(0);
       const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(300);
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(220);
 
     });
 
@@ -83,13 +83,13 @@ describe("StakingContract", function () {
       await time.increase(60 * 60 * 24 *365);
 
       const pendingReward = await dsContract.calculatePendingRewards(0);
-      expect(pendingReward).to.equal(BigInt("220000006976109589041095"));
+      expect(pendingReward).to.equal(BigInt("132000004185665753424657"));
 
       const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
       await dsContract.unstake(0);
       const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(BigInt("320000013952219178082191"));
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(BigInt("232000008371331506849315"));
 
     });
 
@@ -110,13 +110,13 @@ describe("StakingContract", function () {
       await time.increase(60 * 60 * 24 *365);
 
       const pendingReward = await dsContract.calculatePendingRewards(0);
-      expect(pendingReward).to.equal(BigInt("1200000038051506849315068"));
+      expect(pendingReward).to.equal(BigInt("720000022830904109589041"));
 
       const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
       await dsContract.unstake(0);
       const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(BigInt("1700000076103013698630136"));
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(BigInt("1220000045661808219178082"));
 
     });
 
@@ -135,24 +135,24 @@ describe("StakingContract", function () {
       await time.increase(60 * 60 * 24 *365);
 
       const pendingReward = await dsContract.calculatePendingRewards(0);
-      expect(pendingReward).to.equal(200);
+      expect(pendingReward).to.equal(120);
 
       const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
       await dsContract.claimRewards(0);
       const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(200);
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(120);
 
       await time.increase(60 * 60 * 24 *365);
       const pendingReward1 = await dsContract.calculatePendingRewards(0);
-      expect(pendingReward1).to.equal(200);
+      expect(pendingReward1).to.equal(120);
 
 
       const userBalanceBeforeUnstake1 = await token.balanceOf(owner.address);
       await dsContract.unstake(0);
       const userBalanceAfterUnstake1 = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake1.sub(userBalanceBeforeUnstake1)).to.equal(300);
+      expect(userBalanceAfterUnstake1.sub(userBalanceBeforeUnstake1)).to.equal(220);
 
     });
 
@@ -177,14 +177,14 @@ describe("StakingContract", function () {
       await time.increase(60 * 60 * 24 *365);
 
       const pendingReward1 = await dsContract.calculatePendingRewards(1);
-      expect(pendingReward1).to.equal(54);
+      expect(pendingReward1).to.equal(32);
 
       const userBalanceBeforeUnstake = await token.balanceOf(owner.address);
       await dsContract.unstake(0);
       await dsContract.unstake(1);
       const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(454);
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(352);
       expect(await dsContract.userStakeCount(owner.address)).to.equal(2);
       expect(dsContract.unstake(0)).to.be.revertedWith("Already unstaked");
 
@@ -215,7 +215,7 @@ describe("StakingContract", function () {
       await dsContract.unstake(0);
       const userBalanceAfterUnstake = await token.balanceOf(owner.address);
 
-      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(70);
+      expect(userBalanceAfterUnstake.sub(userBalanceBeforeUnstake)).to.equal(25);
       const userInfo1 = await dsContract.userStakes(owner.address, 0);
       console.log(userInfo1);
 
