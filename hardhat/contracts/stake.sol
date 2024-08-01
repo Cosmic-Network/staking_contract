@@ -4,10 +4,8 @@ pragma solidity 0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-
-contract StakingContract is Ownable, ReentrancyGuard{
+contract StakingContract is Ownable{
     using SafeMath for uint;
     using SafeMath for uint256;
 
@@ -71,10 +69,9 @@ contract StakingContract is Ownable, ReentrancyGuard{
         max_penalty = _newPenalty;
     }
  
-    function stake(uint256 _amount, uint256 _lockupDays) public nonReentrant {
+    function stake(uint256 _amount, uint256 _lockupDays) public{
         require(_lockupDays <= MAX_LOCKUP_DAYS, "Invalid lockup days");
         require(_lockupDays > 0, "Invalid lockup days");
-        require(_lockupDays <= 365, "Invalid lockup days");
         require(_amount > 0, "Invalid amount");
         IERC20(cosmicTokenAddress).transferFrom(msg.sender, address(this), _amount);
         
@@ -119,7 +116,7 @@ contract StakingContract is Ownable, ReentrancyGuard{
         return _penalty;
     }
 
-    function unstake(uint256 _index) public nonReentrant{
+    function unstake(uint256 _index) public{
         address _account = msg.sender;
         require(_index < userStakes[_account].length, "Invalid index");
         require(userStakes[_account][_index].unstakedOn == 0, "Already unstaked");
@@ -139,7 +136,7 @@ contract StakingContract is Ownable, ReentrancyGuard{
 
     }
 
-    function claimRewards(uint256 _index) public nonReentrant{
+    function claimRewards(uint256 _index) public{
         address _account = msg.sender;
         require(_index < userStakes[_account].length, "Invalid index");
         uint256 _pendingRewards = calculatePendingRewards(_index);
