@@ -22,7 +22,6 @@ contract CosmicNetwork is ERC20, Ownable {
     }
 
     mapping(uint256 => MintRequest) public mintQueue;
-    mapping(address => bool) public blackList;
 
     constructor()
         ERC20("Cosmic Network", "COSMIC")
@@ -43,8 +42,8 @@ contract CosmicNetwork is ERC20, Ownable {
         require(request.executedOn == 0, "Mint request is already executed");
         require(request.amount > 0, "Invalid mint amount");
         require(totalSupply() + request.amount <= maxSupply, "Max supply reached");
-        _mint(request.to, request.amount);
         request.executedOn = block.timestamp;
         mintExecutedCounter++;
+        _mint(request.to, request.amount);
     }
 }
